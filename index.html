@@ -135,6 +135,21 @@
   .p-row.is-hidden .p-v{color:var(--mute);letter-spacing:.18em}
   .p-row.is-hidden{background:color-mix(in srgb,var(--warn) 7%,transparent);border-radius:6px;padding-left:6px;padding-right:6px}
   .p-row.is-revealed{background:color-mix(in srgb,var(--ok) 8%,transparent);border-radius:6px;padding-left:6px;padding-right:6px}
+  .q-input{width:100%;font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:7px 9px;resize:vertical;min-height:38px}
+  .q-input:focus{outline:2px solid var(--accent);outline-offset:1px}
+  .q-input:disabled{opacity:.88;background:color-mix(in srgb,var(--line) 18%,var(--panel))}
+  .q-opts{display:flex;flex-direction:column;gap:5px}
+  .q-opt{display:flex;gap:8px;align-items:flex-start;border:1px solid var(--line);border-radius:9px;padding:7px 9px;font-size:.86rem;line-height:1.35;cursor:pointer;background:var(--panel)}
+  .q-opt:hover{border-color:var(--accent)}
+  .q-opt input{margin-top:3px;flex:0 0 auto}
+  .q-opt.ok{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,var(--panel))}
+  .q-opt.bad{border-color:var(--ig);background:color-mix(in srgb,var(--ig) 12%,var(--panel))}
+  .q-opt.disabled{cursor:default}
+  .q-feedback{margin-top:7px;font-size:.8rem;font-weight:600;line-height:1.35}
+  .q-feedback.ok{color:var(--ok)}
+  .q-feedback.bad{color:var(--ig)}
+  .q-feedback ul{margin:4px 0 0;padding-left:16px;font-weight:400;color:var(--ink)}
+  .q-feedback .q-given{font-weight:400;color:var(--mute)}
   .p-src{font-size:.72rem;color:var(--mute);margin-top:10px;font-style:italic}
   .p-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;margin-top:16px}
   .p-actions .right{display:flex;gap:8px;flex-wrap:wrap}
@@ -212,7 +227,7 @@
     </div>
     <div class="line">
       <span class="hint" id="count"></span>
-      <span class="hint">· Haz clic en una foto para ampliarla. · <b>Práctica</b> permite elegir el tipo de test, el set de fotos y cuántas muestras hacer. · Imprime en A3 horizontal.</span>
+      <span class="hint">· Haz clic en una foto para ampliarla. · <b>Práctica</b> permite elegir el tipo de test, el set de fotos, la forma de responder y cuántas muestras hacer. · Imprime en A3 horizontal.</span>
     </div>
     <div class="line">
       <span class="hint">Fotos de la tabla:</span>
@@ -307,6 +322,12 @@
             <option value="mix">Mezclado · S1 + S2</option>
           </select>
         </label>
+        <label>Forma de responder
+          <select id="pAnswer">
+            <option value="mc" selected>4 alternativas</option>
+            <option value="text">Campo de texto</option>
+          </select>
+        </label>
         <label>¿Cuántas muestras?
           <select id="pCount">
             <option value="5">5 muestras</option>
@@ -343,14 +364,15 @@
       </label>
 
       <fieldset id="pFields" hidden>
-        <legend>Campos visibles como pista (el resto se oculta)</legend>
+        <legend>Campos visibles como pista (el resto se pregunta)</legend>
         <div class="p-checks" id="pChecks"></div>
       </fieldset>
 
       <p class="p-hint" id="pPoolInfo"></p>
+      <p class="p-hint">En los tests escribes la respuesta o eliges una de las cuatro alternativas. Al pulsar <b>Corregir</b> verás qué campos fallaron y cuál era la respuesta correcta; no hay botón de «mostrar respuesta».</p>
       <div class="p-startrow">
         <button class="btn" id="pStart" type="button">Empezar práctica</button>
-        <span class="p-key"><kbd>Espacio</kbd> muestra la respuesta · <kbd>←</kbd> <kbd>→</kbd> navegan</span>
+        <span class="p-key"><kbd>←</kbd> <kbd>→</kbd> navegan entre muestras ya corregidas</span>
       </div>
     </section>
 
@@ -367,14 +389,9 @@
       <div class="p-actions">
         <button class="btn ghost" id="pPrev" type="button">← Anterior</button>
         <div class="right">
-          <button class="btn" id="pReveal" type="button">Mostrar respuesta</button>
-          <button class="btn ghost" id="pNext" type="button">Siguiente →</button>
+          <button class="btn" id="pSubmit" type="button">Corregir</button>
+          <button class="btn" id="pNext" type="button" hidden>Siguiente →</button>
         </div>
-      </div>
-      <div class="p-assess" id="pAssess" hidden>
-        <span>¿La sabías?</span>
-        <button class="btn ok" data-ok="1" type="button">Sí</button>
-        <button class="btn bad" data-ok="0" type="button">No</button>
       </div>
     </section>
 
@@ -484,6 +501,14 @@ const PRESETS = {
   diag:    ["n","dia"],
   full:    ["n","c","est","ori","cla","comp","ana","dia"]
 };
+const ASKED = {
+  photo:   ["n"],
+  name:    ["c","est","ori","cla","comp","ana","dia"],
+  comp:    ["c","est","ori","cla","ana","dia"],
+  classif: ["c","comp","ana","dia"],
+  diag:    ["c","est","ori","cla","comp","ana"],
+  full:    []
+};
 
 const practice = document.getElementById("practice");
 const pSetup = document.getElementById("pSetup");
@@ -508,14 +533,15 @@ const pFill = document.getElementById("pFill");
 const pScore = document.getElementById("pScore");
 const pPrev = document.getElementById("pPrev");
 const pNext = document.getElementById("pNext");
-const pReveal = document.getElementById("pReveal");
-const pAssess = document.getElementById("pAssess");
+const pSubmit = document.getElementById("pSubmit");
+const pAnswer = document.getElementById("pAnswer");
 const pSummary = document.getElementById("pSummary");
 const pFailed = document.getElementById("pFailed");
 const pRetryFailed = document.getElementById("pRetryFailed");
 
-let pItems = [], pVisible = [], pIndex = 0, pAnswers = new Map(), pRevealed = new Set();
-let pCurrentRevealed = false, pPrevType = pType.value;
+let pItems = [], pVisible = [], pIndex = 0;
+let pDrafts = new Map(), pResults = new Map();
+let pPrevType = pType.value;
 
 pChecks.innerHTML = FIELDS.map(([k,label])=>
   `<label><input type="checkbox" name="pfield" value="${k}" ${k==="n"?"checked":""}> ${label}</label>`).join("");
@@ -530,6 +556,106 @@ function getVisible(){
   }
   return (PRESETS[pType.value]||[]).slice();
 }
+function getAsked(){
+  if(pType.value==="custom"){
+    const vis = new Set(getVisible());
+    return FIELDS.map(([k])=>k).filter(k=>!vis.has(k));
+  }
+  return (ASKED[pType.value]||[]).slice();
+}
+function fieldValue(r,k){
+  return k==="dia" ? r.dia.join(" · ") : r[k];
+}
+
+/* ---- Corrección de respuestas escritas (tolera acentos, mayúsculas y orden) ---- */
+const STOPWORDS = new Set(["con","de","la","el","los","las","por","para","del","una","un","y","o","en","a","al","se","es","son","que","su","sus","como","mas","muy","no","sin","sobre","entre","tipo","textura","color","roca","rocas","grado","origen"]);
+function normText(s){
+  return norm(String(s)).replace(/[^a-z0-9%]+/g," ").replace(/\s+/g," ").trim();
+}
+function tokens(s){
+  return [...new Set(normText(s).split(" ").filter(w=>w.length>=4 && !STOPWORDS.has(w)))];
+}
+function editDistance(a,b){
+  const m=a.length, n=b.length;
+  if(!m) return n; if(!n) return m;
+  let prev=Array.from({length:n+1},(_,i)=>i);
+  for(let i=1;i<=m;i++){
+    const cur=[i];
+    for(let j=1;j<=n;j++){
+      cur[j]=Math.min(prev[j]+1, cur[j-1]+1, prev[j-1]+(a[i-1]===b[j-1]?0:1));
+    }
+    prev=cur;
+  }
+  return prev[n];
+}
+function sameName(a,b){
+  a=normText(a); b=normText(b);
+  if(!a||!b) return false;
+  if(a===b) return true;
+  const d=editDistance(a,b);
+  return 1 - d/Math.max(a.length,b.length) >= 0.8;
+}
+function looseMatch(given,expected){
+  const g=normText(given), e=normText(expected);
+  if(!g||!e) return false;
+  if(g===e) return true;
+  if(g.length>=4 && (e.includes(g)||g.includes(e))) return true;
+  return sameName(g,e);
+}
+function gradeText(k,given,expected){
+  if(!normText(given)) return false;
+  if(k==="n") return sameName(given,expected);
+  if(k==="c") return looseMatch(given,expected);
+  if(k==="est"||k==="ori"||k==="cla"||k==="ana"){
+    if(looseMatch(given,expected)) return true;
+  }
+  const exp=tokens(expected), got=new Set(tokens(given));
+  if(!exp.length) return false;
+  const hit=exp.filter(t=>got.has(t)).length;
+  const ratio = k==="comp" ? 0.2 : (k==="ana" ? 0.34 : 0.5);
+  return hit >= Math.max(2, Math.ceil(exp.length*ratio));
+}
+function gradeDia(given,arr){
+  if(!normText(given)) return false;
+  let hits=0;
+  for(const d of arr){
+    if(looseMatch(given,d)){ hits++; continue; }
+    const exp=tokens(d), got=new Set(tokens(given));
+    if(!exp.length) continue;
+    const hit=exp.filter(t=>got.has(t)).length;
+    if(hit >= Math.max(1, Math.ceil(exp.length*0.5))) hits++;
+  }
+  return hits >= Math.max(2, Math.ceil(arr.length*0.5));
+}
+
+/* ---- Alternativas: correcta + 3 distractores, preferentemente de la misma clase ---- */
+function makeOptions(r,k){
+  const correct = fieldValue(r,k);
+  if(k==="c"){
+    return shuffle(["Ígnea","Sedimentaria","Metamórfica","No indicado en la fuente"]);
+  }
+  const same = DATA.filter(x=>x.id!==r.id && x.c===r.c).map(x=>fieldValue(x,k));
+  const other = DATA.filter(x=>x.id!==r.id && x.c!==r.c).map(x=>fieldValue(x,k));
+  let pool = [...new Set([...same,...other])].filter(v=>v!==correct);
+  pool = shuffle(pool.slice());
+  const opts = [correct, ...pool.slice(0,3)];
+  for(const f of ["No indicado en la fuente.","—","Ninguna de las anteriores"]){
+    if(opts.length>=4) break;
+    if(!opts.includes(f)) opts.push(f);
+  }
+  return shuffle(opts);
+}
+function ensureOptions(r,asked){
+  if(pAnswer.value!=="mc") return;
+  if(!r._mc) r._mc={};
+  for(const k of asked){
+    if(!r._mc[k]){
+      const opts=makeOptions(r,k);
+      r._mc[k]={options:opts, correctIndex:opts.indexOf(fieldValue(r,k))};
+    }
+  }
+}
+
 function practicePool(){
   let pool = pUseFilter.checked ? lastRows.slice() : DATA.slice();
   if(pClass.value!=="Todas") pool = pool.filter(r=>r.c===pClass.value);
@@ -545,8 +671,10 @@ function updatePoolInfo(){
   pFields.hidden = pType.value!=="custom";
   const pool = practicePool();
   const n = requestedCount(pool.length);
+  const campos = getAsked().length;
+  const campoInfo = campos ? `${campos} campo(s) por muestra.` : "modo repaso, sin preguntas.";
   pPoolInfo.textContent = pool.length
-    ? `Hay ${pool.length} roca(s) disponibles; se practicarán ${Math.min(n,pool.length)}.`
+    ? `Hay ${pool.length} roca(s) disponibles; se practicarán ${Math.min(n,pool.length)}; ${campoInfo}`
     : "No hay rocas con esos filtros.";
   pStart.disabled = pool.length===0;
 }
@@ -591,61 +719,118 @@ function itemImgs(r){
 }
 function startQuiz(items, visible){
   pItems = items; pVisible = visible.slice();
-  pIndex = 0; pAnswers = new Map(); pRevealed = new Set();
+  pIndex = 0; pDrafts = new Map(); pResults = new Map();
   pSetup.hidden=true; pEnd.hidden=true; pQuiz.hidden=false;
   renderItem();
+}
+
+function valueRow(r,k,label,cls){
+  let val;
+  if(k==="dia") val = `<ul>${r.dia.map(d=>`<li>${esc(d)}</li>`).join("")}</ul>`;
+  else if(k==="comp") val = esc(r.comp) + (r.nota ? `<span class="note">${esc(r.nota)}</span>` : "");
+  else val = esc(r[k]);
+  return `<div class="p-row ${cls||""}"><div class="p-k">${label}</div><div class="p-v">${val}</div></div>`;
+}
+
+function feedbackHtml(k,res,r){
+  if(!res) return "";
+  let html = `<div class="q-feedback ${res.ok?"ok":"bad"}">${res.ok?"✓ Correcto":"✗ Incorrecto"}`;
+  if(!res.ok){
+    if(k==="dia") html += ` · Correcto:<ul>${r.dia.map(d=>`<li>${esc(d)}</li>`).join("")}</ul>`;
+    else html += ` · Correcto: <b>${esc(res.expected)}</b>`;
+  }
+  return html + `</div>`;
+}
+
+function answerRow(r,k,label,graded){
+  const d = (pDrafts.get(r.id)||{})[k] ?? "";
+  const res = graded ? graded.details[k] : null;
+  let widget = "";
+  if(pAnswer.value==="mc"){
+    ensureOptions(r,[k]);
+    const mc = r._mc[k];
+    const opts = mc.options.map((opt,i)=>{
+      let cls = "q-opt";
+      if(graded){
+        cls += " disabled";
+        if(i===mc.correctIndex) cls += " ok";
+        else if(String(i)===String(d)) cls += " bad";
+      }
+      const checked = String(i)===String(d) ? " checked" : "";
+      return `<label class="${cls}"><input type="radio" name="q-${k}" value="${i}" data-ans="${k}"${checked}${graded?" disabled":""}> <span>${esc(opt)}</span></label>`;
+    }).join("");
+    widget = `<div class="q-opts">${opts}</div>`;
+  } else {
+    const common = `data-ans="${k}" class="q-input"${graded?" disabled":""}`;
+    if(k==="n"||k==="c"){
+      widget = `<input type="text" ${common} value="${esc(d)}" placeholder="${k==="n"?"Nombre de la roca":"Clase de roca"}">`;
+    } else {
+      widget = `<textarea ${common} rows="${k==="dia"?3:2}" placeholder="${k==="dia"?"Escribe al menos 2–3 métodos de diagnóstico…":"Escribe tu respuesta…"}">${esc(d)}</textarea>`;
+    }
+  }
+  return `<div class="p-row ${graded ? (res&&res.ok?"is-revealed":"") : ""}"><div class="p-k">${label}</div><div class="p-v">${widget}${feedbackHtml(k,res,r)}</div></div>`;
 }
 
 function renderItem(){
   const r = pItems[pIndex];
   const vis = new Set(pVisible);
-  const allVis = FIELDS.every(([k])=>vis.has(k));
-  const revealed = pRevealed.has(r.id);
-  pCurrentRevealed = revealed || allVis;
+  const asked = getAsked();
+  const graded = pResults.get(r.id);
+  const isReview = asked.length===0;
 
   const imgs = itemImgs(r);
   pPhoto.className = "p-photo" + (imgs.length>1 ? " multi" : "");
   pPhoto.innerHTML = imgs.map(([src,cap])=>
     `<img src="${esc(src)}" alt="Muestra problema" data-cap="${esc(cap)}">`).join("");
 
-  const showName = vis.has("n") || revealed;
+  const showName = !asked.includes("n") || !!graded;
   let html = `<h3 class="p-title">${showName ? esc(r.n) : "¿Qué roca es?"}</h3>`;
   for(const [k,label] of FIELDS){
-    if(k==="n") continue;
-    const visible = vis.has(k) || revealed;
-    let val;
-    if(k==="dia") val = `<ul>${r.dia.map(d=>`<li>${esc(d)}</li>`).join("")}</ul>`;
-    else if(k==="comp") val = esc(r.comp) + (r.nota ? `<span class="note">${esc(r.nota)}</span>` : "");
-    else val = esc(r[k]);
-    const cls = visible ? (revealed && !vis.has(k) ? "is-revealed" : "") : "is-hidden";
-    html += `<div class="p-row ${cls}"><div class="p-k">${label}</div><div class="p-v">${visible ? val : "•••••"}</div></div>`;
+    const isAsked = asked.includes(k);
+    const isVisible = vis.has(k);
+    if(k==="n" && !isAsked) continue;
+    if(!isAsked && !isVisible && !graded) continue;
+    if(isAsked) html += answerRow(r,k,label,graded);
+    else html += valueRow(r,k,label,graded ? "is-revealed" : "");
   }
-  if(revealed || allVis) html += `<div class="p-src">Fuente: ${esc(r.src)} · Fotos: ${r._set === "s2" ? "set 2" : "set 1"}</div>`;
+  if(graded || isReview) html += `<div class="p-src">Fuente: ${esc(r.src)} · Fotos: ${r._set==="s2"?"set 2":"set 1"}</div>`;
   pData.innerHTML = html;
 
-  pProgress.textContent = `Muestra ${pIndex+1} de ${pItems.length} · ${r._set === "s2" ? "Set 2" : "Set 1"}`;
+  const results = [...pResults.values()];
+  const ok = results.reduce((s,x)=>s+x.correct,0);
+  const total = results.reduce((s,x)=>s+x.total,0);
+  pScore.textContent = total ? `✓ ${ok} · ✗ ${total-ok} campos` : "";
+  pProgress.textContent = `Muestra ${pIndex+1} de ${pItems.length} · ${r._set==="s2"?"Set 2":"Set 1"} · ${isReview?"repaso":asked.length+" campo(s)"}`;
   pFill.style.width = `${((pIndex+1)/pItems.length)*100}%`;
-  const ok = [...pAnswers.values()].filter(Boolean).length;
-  const bad = [...pAnswers.values()].filter(v=>!v).length;
-  pScore.textContent = `✓ ${ok} · ✗ ${bad}`;
 
   pPrev.disabled = pIndex===0;
-  pReveal.hidden = revealed || allVis;
+  pSubmit.hidden = isReview || !!graded;
+  pNext.hidden = !isReview && !graded;
   pNext.textContent = pIndex===pItems.length-1 ? "Terminar" : "Siguiente →";
-
-  const canAssess = revealed && !allVis;
-  pAssess.hidden = !canAssess;
-  if(canAssess){
-    const ans = pAnswers.get(r.id);
-    pAssess.querySelectorAll("[data-ok]").forEach(b=>{
-      b.classList.toggle("sel", ans!==undefined && (b.dataset.ok==="1")===ans);
-    });
-  }
 }
-
-function revealAnswer(){
+function gradeCurrent(){
   const r = pItems[pIndex];
-  pRevealed.add(r.id);
+  const asked = getAsked();
+  if(!asked.length) return;
+  const drafts = pDrafts.get(r.id) || {};
+  const details = {};
+  let correct = 0;
+  for(const k of asked){
+    const given = drafts[k] ?? "";
+    let ok = false;
+    let expected = fieldValue(r,k);
+    if(pAnswer.value==="mc"){
+      ensureOptions(r,asked);
+      const mc = r._mc[k];
+      ok = String(given)===String(mc.correctIndex);
+      expected = mc.options[mc.correctIndex];
+    } else {
+      ok = k==="dia" ? gradeDia(given,r.dia) : gradeText(k,given,expected);
+    }
+    if(ok) correct++;
+    details[k] = {ok, given, expected};
+  }
+  pResults.set(r.id, {total:asked.length, correct, details});
   renderItem();
 }
 function nextItem(){
@@ -657,18 +842,39 @@ function prevItem(){
 }
 function showEnd(){
   pQuiz.hidden=true; pEnd.hidden=false;
-  const evaluated = pAnswers.size;
-  const ok = [...pAnswers.values()].filter(Boolean).length;
-  const bad = evaluated - ok;
-  const failed = pItems.filter(r=>pAnswers.get(r.id)===false);
-  pSummary.innerHTML = evaluated
-    ? `Acertaste <b>${ok}</b> de <b>${evaluated}</b> muestras evaluadas.` + (bad ? ` Fallaron <b>${bad}</b>.` : " ¡Sin fallos!")
-    : "No evaluaste ninguna muestra. Puedes repetir la práctica o volver a la tabla.";
+  const results = [...pResults.values()];
+  const evaluated = results.length;
+  const total = results.reduce((s,x)=>s+x.total,0);
+  const ok = results.reduce((s,x)=>s+x.correct,0);
+  const failed = pItems.filter(r=>{
+    const x = pResults.get(r.id);
+    return x && x.correct < x.total;
+  });
+  pSummary.innerHTML = total
+    ? `Acertaste <b>${ok}</b> de <b>${total}</b> campos en <b>${evaluated}</b> muestra(s).` + (ok<total ? ` Fallaron <b>${total-ok}</b> campo(s).` : " ¡Sin fallos!")
+    : "Modo repaso: no hay campos evaluados. Puedes repetir la práctica o volver a la tabla.";
   pFailed.innerHTML = failed.length
-    ? `<b>Para repasar:</b><ul>${failed.map(r=>`<li>${esc(r.n)}</li>`).join("")}</ul>`
+    ? `<b>Para repasar:</b><ul>${failed.map(r=>{const x=pResults.get(r.id); return `<li>${esc(r.n)} — ${x.correct}/${x.total} campos</li>`;}).join("")}</ul>`
     : "";
   pRetryFailed.hidden = failed.length===0;
 }
+
+pData.addEventListener("input", e=>{
+  const el = e.target.closest("[data-ans]");
+  if(!el || el.disabled) return;
+  const id = pItems[pIndex].id;
+  const d = pDrafts.get(id) || {};
+  d[el.dataset.ans] = el.value;
+  pDrafts.set(id,d);
+});
+pData.addEventListener("change", e=>{
+  const el = e.target.closest('input[type="radio"][data-ans]');
+  if(!el) return;
+  const id = pItems[pIndex].id;
+  const d = pDrafts.get(id) || {};
+  d[el.dataset.ans] = el.value;
+  pDrafts.set(id,d);
+});
 
 document.getElementById("practiceBtn").addEventListener("click", openPractice);
 document.getElementById("pClose").addEventListener("click", closePractice);
@@ -676,28 +882,27 @@ document.getElementById("pBack").addEventListener("click", closePractice);
 pStart.addEventListener("click", startPractice);
 document.getElementById("pAgain").addEventListener("click", startPractice);
 pRetryFailed.addEventListener("click", ()=>{
-  const failed = pItems.filter(r=>pAnswers.get(r.id)===false);
+  const failed = pItems.filter(r=>{
+    const x = pResults.get(r.id);
+    return x && x.correct < x.total;
+  });
   if(failed.length) startQuiz(failed, pVisible);
 });
-pReveal.addEventListener("click", revealAnswer);
+pSubmit.addEventListener("click", gradeCurrent);
 pNext.addEventListener("click", nextItem);
 pPrev.addEventListener("click", prevItem);
-pAssess.addEventListener("click", e=>{
-  const b = e.target.closest("[data-ok]");
-  if(!b) return;
-  pAnswers.set(pItems[pIndex].id, b.dataset.ok==="1");
-  nextItem();
-});
 
 document.addEventListener("keydown", e=>{
   if(!practice.classList.contains("on")) return;
   if(e.key==="Escape"){ closePractice(); return; }
-  if(!pQuiz.hidden){
-    if(e.key===" " || e.key==="Enter"){
-      if(!pReveal.hidden){ e.preventDefault(); revealAnswer(); }
-    } else if(e.key==="ArrowRight"){ e.preventDefault(); nextItem(); }
-    else if(e.key==="ArrowLeft"){ e.preventDefault(); prevItem(); }
+  if(pQuiz.hidden) return;
+  if(e.key==="Enter" && !e.shiftKey && e.target.matches('input[data-ans]') && !pSubmit.hidden){
+    e.preventDefault(); gradeCurrent(); return;
   }
+  const tag = (e.target.tagName||"").toLowerCase();
+  if(tag==="input"||tag==="textarea"||tag==="select") return;
+  if(e.key==="ArrowRight" && !pNext.hidden){ e.preventDefault(); nextItem(); }
+  else if(e.key==="ArrowLeft"){ e.preventDefault(); prevItem(); }
 });
 
 /* ===================== Lightbox ===================== */
@@ -705,7 +910,11 @@ document.addEventListener("click", e=>{
   const img = e.target.closest("#tb .thumbs img, #pPhoto img");
   if(!img) return;
   let cap = img.dataset.cap || img.alt;
-  if(img.closest("#pPhoto")) cap = pCurrentRevealed ? (img.dataset.cap || "Muestra") : "Muestra problema";
+  if(img.closest("#pPhoto")){
+    const r = pItems[pIndex];
+    const done = r && (pResults.has(r.id) || getAsked().length===0);
+    cap = done ? (img.dataset.cap || "Muestra") : "Muestra problema";
+  }
   const lb = document.getElementById("lb");
   lb.querySelector("img").src = img.src;
   lb.querySelector(".cap").textContent = cap;
